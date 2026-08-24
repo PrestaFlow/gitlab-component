@@ -1,0 +1,118 @@
+# PrestaFlow — GitLab CI/CD Component
+# Port of https://github.com/PrestaFlow/github-action
+# Docs: https://github.com/PrestaFlow/gitlab-component
+
+spec:
+  inputs:
+    api_url:
+      description: "PrestaFlow API base URL"
+      default: "https://api.prestaflow.io"
+    token:
+      description: "PrestaFlow API token (pass through a masked CI variable)"
+    project_id:
+      description: "PrestaFlow project Product Key (pk_...). Optional if the token is scoped."
+      default: ""
+    execute:
+      description: "Run `composer run prestaflow:json:file` before upload"
+      default: "true"
+    suites:
+      description: "Comma-separated suite list (empty = all)"
+      default: ""
+    flashlight:
+      description: "Start a PrestaShop Flashlight Docker instance"
+      default: "false"
+    ps_version:
+      description: "Flashlight image tag (9.0.0, 8.1.7, latest)"
+      default: "latest"
+    flashlight_mount:
+      description: "auto|root|modules|themes"
+      default: "auto"
+    flashlight_init_scripts:
+      description: "Path to init scripts dir (mounted read-only at /tmp/init-scripts)"
+      default: ""
+    mr_comment:
+      description: "Post/update an MR note (empty=auto: true on MR pipelines, false otherwise)"
+      default: ""
+    upload_artifacts:
+      description: "Attach results.json + screenshots as GitLab artifacts"
+      default: "true"
+    visual:
+      description: "Enable visual regression round-trip"
+      default: "true"
+    component_repo:
+      description: "Git URL of this component (for cloning scripts into the runner)"
+      default: "https://github.com/PrestaFlow/gitlab-component.git"
+    component_ref:
+      description: "Branch or tag of the component to clone"
+      default: "main"
+    image:
+      description: "Container image used to run the job"
+      default: "composer:2"
+    stage:
+      description: "Pipeline stage"
+      default: "test"
+---
+prestaflow:
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.image ]]
+  # docker:dind is only needed for flashlight=true; harmless otherwise.
+  services:
+    - name: docker:24-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: "tcp://docker:2375/"
+    DOCKER_TLS_CERTDIR: ""
+    PRESTAFLOW_TOKEN: $[[ inputs.token ]]
+    PRESTAFLOW_API_URL: $[[ inputs.api_url ]]
+    PRESTAFLOW_PROJECT_ID: $[[ inputs.project_id ]]
+    PRESTAFLOW_EXECUTE: $[[ inputs.execute ]]
+    PRESTAFLOW_SUITES: $[[ inputs.suites ]]
+    PRESTAFLOW_FLASHLIGHT: $[[ inputs.flashlight ]]
+    PRESTAFLOW_PS_VERSION: $[[ inputs.ps_version ]]
+    PRESTAFLOW_FLASHLIGHT_MOUNT: $[[ inputs.flashlight_mount ]]
+    PRESTAFLOW_FLASHLIGHT_INIT_SCRIPTS: $[[ inputs.flashlight_init_scripts ]]
+    PRESTAFLOW_MR_COMMENT: $[[ inputs.mr_comment ]]
+    PRESTAFLOW_UPLOAD_ARTIFACTS: $[[ inputs.upload_artifacts ]]
+    PRESTAFLOW_VISUAL: $[[ inputs.visual ]]
+    PRESTAFLOW_COMPONENT_REPO: $[[ inputs.component_repo ]]
+    PRESTAFLOW_COMPONENT_REF: $[[ inputs.component_ref ]]
+  before_script:
+    # Ensure the tools the scripts rely on are present. `composer:2` is Alpine;
+    # PHP/Debian bases hit the apt fallback.
+    - |
+      if command -v apk >/dev/null 2>&1; then
+        apk add --no-cache curl jq bash git docker-cli >/dev/null
+      elif command -v apt-get >/dev/null 2>&1; then
+        apt-get update -qq && apt-get install -y --no-install-recommends curl jq bash git ca-certificates docker.io >/dev/null
+      fi
+    # Fetch the component's scripts. Idempotent: if the consumer already
+    # cloned into .prestaflow-component/ in their own before_script, we reuse it.
+    - |
+      if [ ! -d .prestaflow-component/scripts ]; then
+        git clone --depth 1 --branch "$PRESTAFLOW_COMPONENT_REF" \
+          "$PRESTAFLOW_COMPONENT_REPO" .prestaflow-component
+      fi
+    - chmod +x .prestaflow-component/scripts/*.sh
+  script:
+    - bash .prestaflow-component/scripts/flashlight.sh
+    - bash .prestaflow-component/scripts/visual-download.sh
+    - bash .prestaflow-component/scripts/runner.sh
+    - bash .prestaflow-component/scripts/visual-upload.sh
+    - bash .prestaflow-component/scripts/upload.sh
+    - bash .prestaflow-component/scripts/comment-mr.sh
+    - bash .prestaflow-component/scripts/outputs.sh
+  after_script:
+    # Best-effort teardown; ignore errors so job status is preserved.
+    - |
+      if [ -f .prestaflow-flashlight/compose.yml ]; then
+        docker compose -f .prestaflow-flashlight/compose.yml down -v || true
+      fi
+  artifacts:
+    when: always
+    reports:
+      dotenv: prestaflow.env
+    paths:
+      - "**/prestaflow/results.json"
+      - "**/prestaflow/screens/**"
+      - prestaflow.env
+    expire_in: 30 days
