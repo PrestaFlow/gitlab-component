@@ -63,15 +63,15 @@ fi
 if [ -n "$RESULTS" ]; then
   STATS_JSON=$(jq '
     def tonum(x): (x // 0 | tonumber? // 0);
-    def sfrom(s):
-      { name: (s.suite // ""),
-        passed: (s.stats.passes | tonum(.)),
-        failed: (s.stats.failures | tonum(.)),
-        skipped: ((s.stats.skips | tonum(.)) + (s.stats.skippeds | tonum(.))),
-        todos: (s.stats.todos | tonum(.)),
-        durationMs: (s.stats.time | tonum(.)),
-        failures: [ (s.tests // [])[] | select(.state == "fail") | {
-          suite: (s.suite // ""),
+    def sfrom(s): s as $s |
+      { name: ($s.suite // ""),
+        passed: ($s.stats.passes | tonum(.)),
+        failed: ($s.stats.failures | tonum(.)),
+        skipped: (($s.stats.skips | tonum(.)) + ($s.stats.skippeds | tonum(.))),
+        todos: ($s.stats.todos | tonum(.)),
+        durationMs: ($s.stats.time | tonum(.)),
+        failures: [ ($s.tests // [])[] | select(.state == "fail") | {
+          suite: ($s.suite // ""),
           title: (.title // ""),
           message: ((.expect.fail // [])[0] // ""),
           file: (.file // ""),
@@ -87,11 +87,11 @@ if [ -n "$RESULTS" ]; then
     end
     | { suites: [ .[] | {name, passed, failed, skipped, durationMs} ],
         failures: [ .[].failures[] ],
-        passed: [.[].passed] | add // 0,
-        failed: [.[].failed] | add // 0,
-        skipped: [.[].skipped] | add // 0,
-        todos: [.[].todos] | add // 0,
-        durationMs: [.[].durationMs] | add // 0 }
+        passed: ([.[].passed] | add // 0),
+        failed: ([.[].failed] | add // 0),
+        skipped: ([.[].skipped] | add // 0),
+        todos: ([.[].todos] | add // 0),
+        durationMs: ([.[].durationMs] | add // 0) }
     | .total = (.passed + .failed + .skipped + .todos)
   ' "$RESULTS")
 else

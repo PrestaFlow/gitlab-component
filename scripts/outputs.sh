@@ -17,20 +17,20 @@ done
 if [ -n "$RESULTS" ]; then
   STATS=$(jq '
     def tonum(x): (x // 0 | tonumber? // 0);
-    def acc(s):
-      { passed: (s.stats.passes | tonum(.)),
-        failed: (s.stats.failures | tonum(.)),
-        skipped: ((s.stats.skips | tonum(.)) + (s.stats.skippeds | tonum(.))),
-        todos: (s.stats.todos | tonum(.)),
-        durationMs: (s.stats.time | tonum(.)) };
+    def acc(s): s as $s |
+      { passed: ($s.stats.passes | tonum(.)),
+        failed: ($s.stats.failures | tonum(.)),
+        skipped: (($s.stats.skips | tonum(.)) + ($s.stats.skippeds | tonum(.))),
+        todos: ($s.stats.todos | tonum(.)),
+        durationMs: ($s.stats.time | tonum(.)) };
     (if (.suites | type == "array") then [ .suites[] | acc(.) ]
      elif .stats then [ acc(.) ]
      else [] end)
-    | { passed: [.[].passed] | add // 0,
-        failed: [.[].failed] | add // 0,
-        skipped: [.[].skipped] | add // 0,
-        todos: [.[].todos] | add // 0,
-        durationMs: [.[].durationMs] | add // 0 }
+    | { passed: ([.[].passed] | add // 0),
+        failed: ([.[].failed] | add // 0),
+        skipped: ([.[].skipped] | add // 0),
+        todos: ([.[].todos] | add // 0),
+        durationMs: ([.[].durationMs] | add // 0) }
     | .total = (.passed + .failed + .skipped + .todos)
   ' "$RESULTS")
 else
