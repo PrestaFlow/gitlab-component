@@ -1,0 +1,73 @@
+# tests/smoke.yml
+# Offline smoke test — proves the component renders and its scripts run.
+# Overrides PRESTAFLOW_API_URL to point at a locally spun-up mock server, plants
+# a fake results.json, and asserts each script exits cleanly.
+#
+# Usage:
+#   Copy this file to your project's .gitlab-ci.yml (or `include:` it).
+#   The pipeline should succeed on any GitLab runner with a docker executor.
+
+include:
+  - local: templates/prestaflow.yml
+    inputs:
+      token: "test-token-xxxxxxxxxxxx"
+      project_id: "pk_smoke_test"
+      execute: "false"       # No composer.json in this fixture
+      flashlight: "false"    # Don't spin up PrestaShop for the smoke run
+      visual: "false"        # Skip the baseline HTTP call
+      upload_artifacts: "true"
+      mr_comment: "false"    # Not an MR pipeline
+      # Point the component at itself — CI is already inside the checked-out repo.
+      component_repo: "$CI_PROJECT_DIR"
+      component_ref: "HEAD"
+
+# Override the generated job to stub the API and results.
+prestaflow:
+  before_script:
+    - apk add --no-cache curl jq bash git python3 >/dev/null || true
+    - mkdir -p tests/prestaflow
+    - |
+      cat > tests/prestaflow/results.json <<'JSON'
+      {"suites":[{"suite":"Smoke","stats":{"passes":2,"failures":0,"skips":0,"todos":0,"time":123},"tests":[{"title":"boots","state":"pass"},{"title":"talks","state":"pass"}]}]}
+      JSON
+    # Mock server for /ci/github-action and /ci/visual/baselines
+    - |
+      cat > /tmp/mock.py <<'PY'
+      from http.server import BaseHTTPRequestHandler, HTTPServer
+      import json
+      class H(BaseHTTPRequestHandler):
+          def _ok(self, obj):
+              b = json.dumps(obj).encode()
+              self.send_response(200); self.send_header('Content-Type','application/json')
+              self.send_header('Content-Length', str(len(b))); self.end_headers(); self.wfile.write(b)
+          def do_POST(self):
+              length = int(self.headers.get('Content-Length','0'))
+              self.rfile.read(length)
+              self._ok({"id":"smoke-123","url":"https://prestaflow.io/r/smoke-123"})
+          def do_GET(self):
+              self._ok({"baselines":[],"branch":None,"manifest_sha256":"deadbeef"})
+          def log_message(self, *a, **k): pass
+      HTTPServer(("127.0.0.1", 8787), H).serve_forever()
+      PY
+    - python3 /tmp/mock.py &
+    - sleep 1
+    # Ensure our scripts are in place (component clone step from the template).
+    - if [ ! -d .prestaflow-component ]; then mkdir -p .prestaflow-component && cp -r scripts templates .prestaflow-component/; fi
+    - chmod +x .prestaflow-component/scripts/*.sh
+  variables:
+    PRESTAFLOW_API_URL: "http://127.0.0.1:8787"
+  script:
+    - bash .prestaflow-component/scripts/flashlight.sh
+    - bash .prestaflow-component/scripts/visual-download.sh
+    - bash .prestaflow-component/scripts/runner.sh
+    - bash .prestaflow-component/scripts/visual-upload.sh
+    - bash .prestaflow-component/scripts/upload.sh
+    - bash .prestaflow-component/scripts/comment-mr.sh
+    - bash .prestaflow-component/scripts/outputs.sh
+    - |
+      echo "--- prestaflow.env ---"
+      cat prestaflow.env
+      grep -q "PRESTAFLOW_REPORT_ID=smoke-123" prestaflow.env
+      grep -q "PRESTAFLOW_STATUS=success" prestaflow.env
+      grep -q "PRESTAFLOW_TOTAL=2" prestaflow.env
+      echo "SMOKE OK"
