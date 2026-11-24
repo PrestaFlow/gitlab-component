@@ -22,7 +22,7 @@ spec:
       description: "Start a PrestaShop Flashlight Docker instance"
       default: "false"
     ps_version:
-      description: "Flashlight image tag (9.0.0, 8.1.7, latest)"
+      description: "Flashlight image tag (9.0.0, 8.2.8-nginx, latest). The PrestaShop version given to the tests (PRESTAFLOW_PS_VERSION) is read from it, or from the image for a tag without a version."
       default: "latest"
     flashlight_mount:
       description: "auto|root|modules|themes"
@@ -30,6 +30,9 @@ spec:
     flashlight_init_scripts:
       description: "Path to init scripts dir (mounted read-only at /tmp/init-scripts)"
       default: ""
+    flashlight_install_module:
+      description: "When composer.json is a prestashop-module, run `php bin/console prestashop:module install <name>` in Flashlight once the shop is ready. A failed install only warns. Set to \"false\" to skip."
+      default: "true"
     mr_comment:
       description: "Post/update an MR note (empty=auto: true on MR pipelines, false otherwise)"
       default: ""
@@ -68,9 +71,12 @@ prestaflow:
     PRESTAFLOW_EXECUTE: $[[ inputs.execute ]]
     PRESTAFLOW_SUITES: $[[ inputs.suites ]]
     PRESTAFLOW_FLASHLIGHT: $[[ inputs.flashlight ]]
-    PRESTAFLOW_PS_VERSION: $[[ inputs.ps_version ]]
+    # The image tag, not the version given to the tests: flashlight.sh derives
+    # PRESTAFLOW_PS_VERSION from it and writes it to .env.local.
+    PRESTAFLOW_FLASHLIGHT_TAG: $[[ inputs.ps_version ]]
     PRESTAFLOW_FLASHLIGHT_MOUNT: $[[ inputs.flashlight_mount ]]
     PRESTAFLOW_FLASHLIGHT_INIT_SCRIPTS: $[[ inputs.flashlight_init_scripts ]]
+    PRESTAFLOW_FLASHLIGHT_INSTALL_MODULE: $[[ inputs.flashlight_install_module ]]
     PRESTAFLOW_MR_COMMENT: $[[ inputs.mr_comment ]]
     PRESTAFLOW_UPLOAD_ARTIFACTS: $[[ inputs.upload_artifacts ]]
     PRESTAFLOW_VISUAL: $[[ inputs.visual ]]
@@ -81,7 +87,7 @@ prestaflow:
     # PHP/Debian bases hit the apt fallback.
     - |
       if command -v apk >/dev/null 2>&1; then
-        apk add --no-cache curl jq bash git docker-cli >/dev/null
+        apk add --no-cache curl jq bash git docker-cli docker-cli-compose >/dev/null
       elif command -v apt-get >/dev/null 2>&1; then
         apt-get update -qq && apt-get install -y --no-install-recommends curl jq bash git ca-certificates docker.io >/dev/null
       fi
@@ -103,6 +109,8 @@ prestaflow:
     - bash .prestaflow-component/scripts/outputs.sh
   after_script:
     # Best-effort teardown; ignore errors so job status is preserved.
+    # Put the repository's .env.local back (or remove the generated one).
+    - bash .prestaflow-component/scripts/flashlight-restore.sh || true
     - |
       if [ -f .prestaflow-flashlight/compose.yml ]; then
         docker compose -f .prestaflow-flashlight/compose.yml down -v || true
