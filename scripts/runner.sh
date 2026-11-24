@@ -30,8 +30,19 @@ echo "runner: composer run prestaflow:json:file (suites=${SUITES:-<all>})"
 
 # Do NOT propagate a non-zero exit — the composer script's exit reflects test
 # outcomes (Pest), and the report is uploaded downstream regardless.
+# With Flashlight, flashlight.sh merged the PRESTAFLOW_* job variables into
+# .env.local. They are removed from composer's environment, or phpdotenv
+# (immutable) would skip the file's value for them (src/runner in the Action).
+STRIP=()
+KEYS_FILE="${CI_PROJECT_DIR:-$PWD}/.prestaflow-flashlight/dotenv-keys"
+if [ -f "$KEYS_FILE" ]; then
+  while IFS= read -r key; do
+    if [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then STRIP+=(-u "$key"); fi
+  done < "$KEYS_FILE"
+fi
+
 set +e
-composer run prestaflow:json:file
+env ${STRIP[@]+"${STRIP[@]}"} composer run prestaflow:json:file
 RC=$?
 set -e
 
