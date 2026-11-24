@@ -48,7 +48,15 @@ Flashlight fixes of the GitHub Action v2.3.0 to v2.4.1, for
 - A `PRESTAFLOW_*` CI/CD variable now reaches the tests with Flashlight, and
   wins over the generated values (e.g. `PRESTAFLOW_THEME: hummingbird` for
   `latest`, which is PrestaShop 9.2).
-- The README examples reference `v0.2.0`.
+- **Installation from GitHub with `include: remote`**, pinned to a tag
+  (`https://raw.githubusercontent.com/PrestaFlow/gitlab-component/v0.2.0/templates/prestaflow.yml`).
+  The README described a gitlab.com mirror (`gitlab.com/prestaflow/ci`) that
+  was never published, and an "Option B" (`include: local` of a file cloned in
+  `before_script`) that cannot work: includes are resolved when the pipeline
+  is created. Mirroring is now an optional section for your own instance.
+- The `component_ref` input defaults to the template's own release (`v0.2.0`,
+  was `main`), so the cloned scripts match the YAML. The release workflow
+  checks it instead of mirroring to gitlab.com.
 
 ## [0.1.0] - 2026-08-24
 

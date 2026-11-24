@@ -1,6 +1,7 @@
 # PrestaFlow — GitLab CI/CD Component
 # Port of https://github.com/PrestaFlow/github-action
 # Docs: https://github.com/PrestaFlow/gitlab-component
+# Include: https://raw.githubusercontent.com/PrestaFlow/gitlab-component/<tag>/templates/prestaflow.yml
 
 spec:
   inputs:
@@ -46,8 +47,8 @@ spec:
       description: "Git URL of this component (for cloning scripts into the runner)"
       default: "https://github.com/PrestaFlow/gitlab-component.git"
     component_ref:
-      description: "Branch or tag of the component to clone"
-      default: "main"
+      description: "Branch or tag of the component to clone. Defaults to the release this template comes from, so the scripts match it."
+      default: "v0.2.0"
     image:
       description: "Container image used to run the job"
       default: "composer:2"
