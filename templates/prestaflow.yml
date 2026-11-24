@@ -48,7 +48,7 @@ spec:
       default: "https://github.com/PrestaFlow/gitlab-component.git"
     component_ref:
       description: "Branch or tag of the component to clone. Defaults to the release this template comes from, so the scripts match it."
-      default: "v0.2.0"
+      default: "v0.2.1"
     image:
       description: "Container image used to run the job"
       default: "composer:2"

@@ -18,7 +18,7 @@ The component lives on GitHub. Include its template straight from there with
 
 ```yaml
 include:
-  - remote: https://raw.githubusercontent.com/PrestaFlow/gitlab-component/v0.2.0/templates/prestaflow.yml
+  - remote: https://raw.githubusercontent.com/PrestaFlow/gitlab-component/v0.2.1/templates/prestaflow.yml
     inputs:
       token: $PRESTAFLOW_TOKEN
 ```
@@ -40,7 +40,7 @@ own tag, so the YAML and the scripts always match.
 
 ```yaml
 include:
-  - remote: https://raw.githubusercontent.com/PrestaFlow/gitlab-component/v0.2.0/templates/prestaflow.yml
+  - remote: https://raw.githubusercontent.com/PrestaFlow/gitlab-component/v0.2.1/templates/prestaflow.yml
     inputs:
       token: $PRESTAFLOW_TOKEN
       project_id: pk_01ABCDEF
@@ -184,7 +184,7 @@ already exists). The scripts are then invoked as
 `bash .prestaflow-component/scripts/<name>.sh`.
 
 The clone URL defaults to this GitHub repository and the ref to the release the
-template comes from (`v0.2.0` for this one; the release workflow checks it).
+template comes from (`v0.2.1` for this one; the release workflow checks it).
 Override them with the `component_repo` / `component_ref` inputs if you fork.
 
 ---
@@ -203,7 +203,7 @@ git push --mirror gitlab
 
 Then enable "CI/CD Catalog project" in **Settings → General**, publish a release
 for the tag, and use
-`component: gitlab.example.com/<group>/prestaflow-ci/prestaflow@v0.2.0`.
+`component: gitlab.example.com/<group>/prestaflow-ci/prestaflow@v0.2.1`.
 
 ---
 
