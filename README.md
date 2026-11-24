@@ -13,48 +13,26 @@ on the backend), same MR/PR comment format.
 
 ## Installation
 
-The component lives on GitHub (`PrestaFlow/gitlab-component`). GitLab's Catalog
-`include: - component:` shorthand only resolves against `$CI_SERVER_FQDN` (typically
-`gitlab.com`), so pick one of the two ways to consume it:
-
-### Option A — mirror to gitlab.com (recommended)
-
-Push this repository as a mirror to `gitlab.com/prestaflow/ci`, then in your
-`.gitlab-ci.yml`:
+The component lives on GitHub. Include its template straight from there with
+`include: remote`, pinned to a release tag, and pass the inputs as usual:
 
 ```yaml
 include:
-  - component: gitlab.com/prestaflow/ci/prestaflow@v0.2.0
+  - remote: https://raw.githubusercontent.com/PrestaFlow/gitlab-component/v0.2.0/templates/prestaflow.yml
     inputs:
       token: $PRESTAFLOW_TOKEN
 ```
 
-Publish the release on GitLab so the ref shows in the CI/CD Catalog listing.
+No mirror, account or token is needed on the GitLab side. The template adds a
+`prestaflow` job; its `before_script` clones the component's scripts from GitHub
+at the same release (see [Script bundling](#script-bundling)).
 
-### Option B — consume directly from GitHub
+To upgrade, change the tag in the URL. The template of each release clones its
+own tag, so the YAML and the scripts always match.
 
-If you do not want to maintain a mirror, `git clone` the component in a
-`before_script` and `include:` a local file:
-
-```yaml
-default:
-  before_script:
-    - if [ ! -d .prestaflow-component ]; then
-        git clone --depth 1 --branch v0.2.0
-          https://github.com/PrestaFlow/gitlab-component.git .prestaflow-component;
-      fi
-
-include:
-  - local: .prestaflow-component/templates/prestaflow.yml
-    inputs:
-      token: $PRESTAFLOW_TOKEN
-```
-
-Either way, the scripts run **directly from the checked-out component sources**
-(`$CI_PROJECT_DIR/.prestaflow-component/scripts/*.sh` in Option B, or the path
-resolved by `$CI_COMPONENT_REF_PATH`-style variables in Option A). The template's
-`before_script` handles the clone in Option A too — see [Script bundling](#script-bundling)
-below.
+> The `component: gitlab.com/…` shorthand of the CI/CD Catalog only resolves
+> components hosted on your GitLab instance. If you mirror this repository there
+> yourself, see [Mirroring](#mirroring).
 
 ---
 
@@ -62,7 +40,7 @@ below.
 
 ```yaml
 include:
-  - component: gitlab.com/prestaflow/ci/prestaflow@v0.2.0
+  - remote: https://raw.githubusercontent.com/PrestaFlow/gitlab-component/v0.2.0/templates/prestaflow.yml
     inputs:
       token: $PRESTAFLOW_TOKEN
       project_id: pk_01ABCDEF
@@ -201,30 +179,31 @@ notify:
 GitLab CI Components ship YAML only — they do **not** copy the component
 repository's files into the runner's workspace. To reach `scripts/*.sh` at
 runtime, the template's `before_script` clones the component's source into
-`$CI_PROJECT_DIR/.prestaflow-component/` (idempotent — skipped if present, as
-happens when the consumer already cloned in their own `before_script` per
-Option B). The scripts are then invoked as
+`$CI_PROJECT_DIR/.prestaflow-component/` (idempotent — skipped if the folder
+already exists). The scripts are then invoked as
 `bash .prestaflow-component/scripts/<name>.sh`.
 
-The clone URL and ref default to this GitHub repo at `main`; override with the
-`component_repo` / `component_ref` inputs if you fork or pin.
+The clone URL defaults to this GitHub repository and the ref to the release the
+template comes from (`v0.2.0` for this one; the release workflow checks it).
+Override them with the `component_repo` / `component_ref` inputs if you fork.
 
 ---
 
-## Migration / mirroring
+## Mirroring
 
-To publish this component on gitlab.com's CI/CD Catalog:
+Optional. To consume the component with the CI/CD Catalog shorthand on your own
+GitLab instance, mirror this repository there:
 
 ```bash
 git clone --mirror https://github.com/PrestaFlow/gitlab-component.git
 cd gitlab-component.git
-git remote add gitlab https://gitlab.com/prestaflow/ci.git
+git remote add gitlab https://gitlab.example.com/<group>/prestaflow-ci.git
 git push --mirror gitlab
 ```
 
-Then in the gitlab.com project, tag a release (`v0.1.0`, `v0.2.0`, …) and enable
-"CI/CD Catalog project" in **Settings → General**. Consumers can then use the
-canonical `component:` shorthand.
+Then enable "CI/CD Catalog project" in **Settings → General**, publish a release
+for the tag, and use
+`component: gitlab.example.com/<group>/prestaflow-ci/prestaflow@v0.2.0`.
 
 ---
 

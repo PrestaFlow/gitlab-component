@@ -5,30 +5,24 @@ on:
     tags:
       - 'v*'
 
+# Consumers include templates/prestaflow.yml straight from GitHub at the tag
+# (include: remote), so a release is just the tag: nothing is mirrored or
+# uploaded. This only checks that the template clones its own scripts.
+permissions:
+  contents: read
+
 jobs:
-  mirror-to-gitlab:
+  check-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout with full history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Push to gitlab.com/prestaflow/ci
-        env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-          GITLAB_PROJECT: prestaflow/ci
+      - name: Template component_ref matches the tag
         run: |
           set -euo pipefail
-          if [ -z "${GITLAB_TOKEN:-}" ]; then
-            echo "::error::GITLAB_TOKEN secret not set. Create a personal or project access token on gitlab.com with 'api,write_repository' scopes and add it as GITLAB_TOKEN in this repo's secrets."
+          ref=$(awk '/^    component_ref:/{f=1} f && /default:/{gsub(/[" ]/,"",$2); print $2; exit}' templates/prestaflow.yml)
+          if [ "$ref" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::templates/prestaflow.yml has component_ref default '${ref}', expected '${GITHUB_REF_NAME}'. The template would clone other scripts than its own."
             exit 1
           fi
-          git config user.name "PrestaFlow Release Bot"
-          git config user.email "noreply@prestaflow.io"
-          git remote add gitlab "https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_PROJECT}.git"
-          git push gitlab --mirror
-
-      - name: Note next steps
-        run: |
-          echo "::notice::Component pushed to gitlab.com/${GITLAB_PROJECT}. Ensure the CI/CD Catalog page for this project is published: https://gitlab.com/${GITLAB_PROJECT}/-/settings/general → Visibility → Catalog resource."
+          echo "::notice::Include with: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/templates/prestaflow.yml"
